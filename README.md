@@ -71,3 +71,4 @@ cargo espflash monitor
 
 - [Tokio running on esp32!](https://github.com/jasta/esp32-tokio-demo)
 - [IRC bot with JSON API for esp32](https://github.com/sjm42/esp32ircbot)
+- [ESP (Ikea) Vindriktning & Rust 🦀](https://github.com/vojty/ESP-Vindriktning/blob/main/src/wifi.rs)

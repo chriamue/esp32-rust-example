@@ -1,64 +1,107 @@
-use embedded_svc::wifi::{AuthMethod, ClientConfiguration, Configuration};
-use esp_idf_svc::eventloop::EspSystemEventLoop;
-use esp_idf_svc::hal::peripherals::Peripherals;
-use esp_idf_svc::nvs::EspDefaultNvsPartition;
-use esp_idf_svc::timer::EspTaskTimerService;
-use esp_idf_svc::wifi::{AsyncWifi, EspWifi};
-use esp_idf_sys as _;
-use esp_idf_sys::EspError;
-use log::info;
+// source: https://github.com/vojty/ESP-Vindriktning/blob/main/src/wifi.rs
+
+use std::thread;
+use std::time::Duration;
+
+use embedded_svc::wifi::{ClientConfiguration, Configuration};
+use esp_idf_svc::hal::peripheral;
+use esp_idf_svc::{
+    eventloop::EspSystemEventLoop,
+    wifi::{BlockingWifi, EspWifi},
+};
+use log::*;
 
 const WIFI_SSID: &str = env!("WIFI_SSID");
-const WIFI_PASS: &str = env!("WIFI_PASS");
+const WIFI_PASSWORD: &str = env!("WIFI_PASS");
 
-pub struct Wifi<'a> {
-    wifi: AsyncWifi<EspWifi<'a>>,
+/**
+ * This is a workaround for a bug in the ESP-IDF wifi stack.
+ * see https://github.com/esp-rs/esp-idf-svc/issues/304#issuecomment-1865823612
+ */
+pub trait WifiConnectFix {
+    fn connect_with_retry(&mut self) -> anyhow::Result<()>;
 }
 
-impl<'a> Wifi<'a> {
-    pub fn new() -> anyhow::Result<Self> {
-        let peripherals = Peripherals::take()?;
-        let sys_loop = EspSystemEventLoop::take()?;
-        let timer_service = EspTaskTimerService::new()?;
-        let nvs = EspDefaultNvsPartition::take()?;
+impl WifiConnectFix for BlockingWifi<EspWifi<'_>> {
+    fn connect_with_retry(&mut self) -> anyhow::Result<()> {
+        let mut retry_delay_ms = 1_000;
+        loop {
+            info!("Connecting wifi...");
+            match self.connect() {
+                Ok(()) => break,
+                Err(e) => {
+                    warn!(
+                        "Wifi connect failed, reason {}, retrying in {}s",
+                        e,
+                        retry_delay_ms / 1000
+                    );
+                    thread::sleep(Duration::from_millis(retry_delay_ms));
 
-        let wifi = AsyncWifi::wrap(
-            EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs))?,
-            sys_loop,
-            timer_service,
-        )?;
-        Ok(Self { wifi })
-    }
+                    // increase the delay exponentially, but cap it at 10s
+                    retry_delay_ms = std::cmp::min(retry_delay_ms * 2, 10_000);
 
-    pub async fn configure(&mut self) -> Result<(), EspError> {
-        info!("Setting Wi-Fi credentials...");
+                    self.stop()?;
+                    self.start()?;
+                }
+            }
+        }
 
-        let wifi_configuration: Configuration = Configuration::Client(ClientConfiguration {
-            ssid: WIFI_SSID.try_into().unwrap(),
-            bssid: None,
-            auth_method: AuthMethod::WPAWPA2Personal,
-            password: WIFI_PASS.try_into().unwrap(),
-            channel: None,
-        });
+        info!("Waiting for DHCP lease...");
 
-        self.wifi.set_configuration(&wifi_configuration)?;
-
-        info!("Starting Wi-Fi driver...");
-        self.wifi.start().await
-    }
-
-    pub async fn connect(&mut self) -> Result<(), EspError> {
-        self.wifi.connect().await?;
-        info!("Wifi connected");
-
-        self.wifi.wait_netif_up().await?;
-        info!("Wifi netif up");
+        self.wait_netif_up()?;
         Ok(())
     }
+}
 
-    pub async fn disconnect(&mut self) -> Result<(), EspError> {
-        self.wifi.disconnect().await?;
-        info!("Wifi disconnected");
-        Ok(())
-    }
+// https://github.com/ivmarkov/rust-esp32-std-demo/blob/main/src/main.rs#L1266
+pub fn wifi(
+    modem: impl peripheral::Peripheral<P = esp_idf_svc::hal::modem::Modem> + 'static,
+    sysloop: EspSystemEventLoop,
+) -> anyhow::Result<BlockingWifi<EspWifi<'static>>> {
+    let esp_wifi = EspWifi::new(modem, sysloop.clone(), None)?;
+
+    let mut wifi = BlockingWifi::wrap(esp_wifi, sysloop)?;
+
+    wifi.set_configuration(&Configuration::Client(ClientConfiguration::default()))?;
+
+    info!("Starting wifi...");
+
+    wifi.start()?;
+
+    info!("Scanning...");
+
+    let ap_infos = wifi.scan()?;
+
+    let ours = ap_infos.into_iter().find(|a| a.ssid == WIFI_SSID);
+
+    let channel = if let Some(ours) = ours {
+        info!(
+            "Found configured access point {} on channel {}",
+            WIFI_SSID, ours.channel
+        );
+        Some(ours.channel)
+    } else {
+        info!(
+            "Configured access point {} not found during scanning, will go with unknown channel",
+            WIFI_SSID
+        );
+        None
+    };
+
+    wifi.set_configuration(&Configuration::Client(ClientConfiguration {
+        ssid: WIFI_SSID.try_into().unwrap(),
+        password: WIFI_PASSWORD.try_into().unwrap(),
+        channel,
+        ..Default::default()
+    }))?;
+
+    wifi.start()?;
+
+    wifi.connect_with_retry()?;
+
+    let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
+
+    info!("Wifi DHCP info: {:?}", ip_info);
+
+    Ok(wifi)
 }
