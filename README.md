@@ -46,6 +46,10 @@ If you get an error like:
 
 Try to press the boot button on the ESP32 board and run the command again.
 
+## Setup
+
+Copy `example.env` to `.env` and adjust the settings.
+
 ## Building
 
 ```bash
@@ -58,3 +62,12 @@ cargo build
 ```bash
 cargo espflash monitor
 ```
+
+## License
+
+[MIT](LICENSE)
+
+## See also
+
+- [Tokio running on esp32!](https://github.com/jasta/esp32-tokio-demo)
+- [IRC bot with JSON API for esp32](https://github.com/sjm42/esp32ircbot)

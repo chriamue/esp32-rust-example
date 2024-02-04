@@ -30,10 +30,13 @@ embassy = [
 ]
 
 [dependencies]
-anyhow = "1.0.79"
+anyhow = "1"
 axum = { version = "0.7", features = ["http1", "json"] }
 esp-idf-sys = { version = "0.34", features = ["binstart"] }
 esp-idf-svc = { version = "0.48", default-features = false }
+embedded-svc = { version = "0.27", features = ["experimental"] }
+embedded-hal = "1.0"
+
 futures = "0.3"
 log = { version = "0.4", default-features = false }
 mio = { version = "0.8", features = ["log"] }
@@ -42,6 +45,8 @@ tokio = { version = "1", features = ["rt", "net", "io-util"] }
 tower-http = { version = "0" }
 
 [build-dependencies]
+anyhow = "1"
+dotenv = "0.15.0"
 embuild = "0.31.3"
 
 [dev-dependencies]

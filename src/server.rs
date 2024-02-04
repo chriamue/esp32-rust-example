@@ -2,7 +2,7 @@ use axum::{response::Html, routing::get, Router};
 use log::info;
 use tokio::net::TcpListener;
 
-const TCP_LISTENING_PORT: u16 = 80;
+const TCP_LISTENING_PORT: &str = env!("SERVER_PORT");
 
 pub async fn server() -> anyhow::Result<()> {
     let addr = format!("0.0.0.0:{TCP_LISTENING_PORT}");
