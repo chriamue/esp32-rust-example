@@ -1,3 +1,5 @@
+use esp32_rust_example::*;
+
 use anyhow::Ok;
 use esp_idf_sys::esp_app_desc;
 
