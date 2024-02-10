@@ -60,7 +60,7 @@ cargo build
 ## Flashing
 
 ```bash
-cargo espflash monitor
+cargo espflash flash --release --monitor --partition-table partitions.csv
 ```
 
 ## License
