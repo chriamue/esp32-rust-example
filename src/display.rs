@@ -1,7 +1,8 @@
+use std::fmt::Write;
+
 // source: https://github.com/andy31415/rust-esp32-c3-demos/blob/oled_wifi/src/main.rs
 // https://randomnerdtutorials.com/esp32-ssd1306-oled-display-arduino-ide/
 // https://www.roboter-bausatz.de/p/lora-esp32-entwicklungsboard-sx1278-mit-0.96-oled-display-v3-868mhz-915mhz
-
 use anyhow::Result;
 use embedded_graphics::{
     mono_font::{ascii::FONT_6X10, MonoTextStyleBuilder},
@@ -11,86 +12,97 @@ use embedded_graphics::{
 };
 use esp_idf_hal::{
     delay::FreeRtos,
-    gpio::{self, PinDriver},
-    i2c::{I2cConfig, I2cDriver, I2C0},
+    gpio::{InputPin, Output, OutputPin, Pin, PinDriver},
+    i2c::{I2c, I2cConfig, I2cDriver},
+    peripheral::Peripheral,
     prelude::FromValueType,
 };
-use ssd1306::{mode::BufferedGraphicsMode, prelude::*, I2CDisplayInterface, Ssd1306};
+use ssd1306::{
+    mode::{BufferedGraphicsMode, DisplayConfig},
+    prelude::I2CInterface,
+    rotation::DisplayRotation,
+    size::DisplaySize128x64,
+    I2CDisplayInterface, Ssd1306,
+};
 
-pub struct Display {}
+pub struct Display<'a, T: OutputPin>
+where
+    T: OutputPin,
+{
+    display: Ssd1306<
+        I2CInterface<I2cDriver<'a>>,
+        DisplaySize128x64,
+        BufferedGraphicsMode<DisplaySize128x64>,
+    >,
+    reset: PinDriver<'a, T, Output>,
+}
 
-impl Display {
-    pub fn new(
-        i2c: I2C0,
-        #[cfg(feature = "v2")]
-        rst: gpio::Gpio16,
-        #[cfg(feature = "v3")]
-        rst: gpio::Gpio21,
-        #[cfg(feature = "v2")]
-        sda: gpio::Gpio4,
-        #[cfg(feature = "v3")]
-        sda: gpio::Gpio17,
-        #[cfg(feature = "v2")]
-        scl: gpio::Gpio15,
-        #[cfg(feature = "v3")]
-        scl: gpio::Gpio18,
-    ) -> Result<
-        Ssd1306<
-            I2CInterface<I2cDriver<'static>>,
-            DisplaySize128x64,
-            BufferedGraphicsMode<DisplaySize128x64>,
-        >,
-    > {
-        // important to set the pin high, otherwise the display won't work
+pub type DisplayType = Ssd1306<
+    I2CInterface<I2cDriver<'static>>,
+    DisplaySize128x64,
+    BufferedGraphicsMode<DisplaySize128x64>,
+>;
 
-        let mut oled_reset = PinDriver::output(rst)?;
-
-        oled_reset.set_high()?;
-        FreeRtos::delay_ms(1);
-        oled_reset.set_low()?;
-        FreeRtos::delay_ms(10);
-        oled_reset.set_high()?;
+impl<'a, T: Pin> Display<'a, T>
+where
+    T: OutputPin,
+{
+    pub fn new<I2C: I2c>(
+        i2c: impl Peripheral<P = I2C> + 'a,
+        rst: impl Peripheral<P = T> + 'a,
+        sda: impl Peripheral<P = impl InputPin + OutputPin> + 'a,
+        scl: impl Peripheral<P = impl InputPin + OutputPin> + 'a,
+    ) -> Result<Display<'a, T>> {
+        // lifetime is important here
+        // or the display will turn off
+        let reset: PinDriver<'a, T, Output> = PinDriver::output(rst).unwrap();
 
         let config = I2cConfig::new().baudrate(400.kHz().into());
-        let i2c = I2cDriver::new(i2c, sda, scl, &config)?;
 
-        let interface = I2CDisplayInterface::new(i2c);
+        let i2c_driver: I2cDriver<'a> = I2cDriver::new(i2c, sda, scl, &config).unwrap();
+        let interface: I2CInterface<I2cDriver<'a>> = I2CDisplayInterface::new(i2c_driver);
 
-        let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
+        let display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
             .into_buffered_graphics_mode();
 
-        display
-            .init()
-            .map_err(|e| anyhow::anyhow!("Display error: {:?}", e))?;
-
-        Ok(display)
+        Ok(Self { display, reset })
     }
 
-    pub fn run(
-        display: &mut Ssd1306<
-            I2CInterface<I2cDriver<'static>>,
-            DisplaySize128x64,
-            BufferedGraphicsMode<DisplaySize128x64>,
-        >,
-        text: &str,
-    ) -> Result<()> {
+    pub fn init(&mut self) -> Result<()> {
+        self.reset.set_high().unwrap();
+        self.display
+            .init()
+            .map_err(|e| anyhow::anyhow!("Display error: {:?}", e))?;
+        Ok(())
+    }
+
+    pub fn reset(&mut self) -> Result<()> {
+        self.reset.set_high().unwrap();
+        FreeRtos::delay_ms(1);
+        self.reset.set_low().unwrap();
+        FreeRtos::delay_ms(10);
+        self.reset.set_high().unwrap();
+        self.init()?;
+        Ok(())
+    }
+
+    pub fn print(&mut self, text: &str) -> Result<()> {
+        self.display.clear_buffer();
         let text_style = MonoTextStyleBuilder::new()
             .font(&FONT_6X10)
             .text_color(BinaryColor::On)
             .build();
 
         Text::with_baseline(
-            &format!("Text: {}", text),
+            &format!("{}", text),
             Point::new(0, 16),
             text_style,
             Baseline::Top,
         )
-        .draw(display)
+        .draw(&mut self.display)
         .map_err(|e| anyhow::anyhow!("Txt2 error: {:?}", e))?;
 
-        println!("Displaying...");
-
-        display
+        self.display
             .flush()
             .map_err(|e| anyhow::anyhow!("Flush error: {:?}", e))?;
 
