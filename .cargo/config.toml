@@ -6,12 +6,23 @@ target = "xtensa-esp32-espidf"
 linker = "ldproxy"
 # runner = "espflash --monitor" # Select this runner for espflash v1.x.x
 runner = "espflash flash --monitor" # Select this runner for espflash v2.x.x
-rustflags = ["--cfg", "mio_unsupported_force_poll_poll", "--cfg", "espidf_time64", "-C", "default-linker-libraries"]
+rustflags = [
+    "--cfg",
+    "esp32",
+    "--cfg",
+    "mio_unsupported_force_poll_poll",
+    "--cfg",
+    "espidf_time64",
+    "-C",
+    "default-linker-libraries",
+]
 
 [target.xtensa-esp32s3-espidf]
 linker = "ldproxy"
 runner = "espflash flash --monitor"
 rustflags = [
+    "--cfg",
+    "esp32s3",
     "--cfg",
     "mio_unsupported_force_poll_poll",
     "--cfg",

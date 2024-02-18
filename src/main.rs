@@ -20,24 +20,24 @@ fn main() -> anyhow::Result<()> {
         modem, pins, i2c0, ..
     } = peripherals;
 
-    #[cfg(feature = "v2")]
+    #[cfg(feature = "esp32")]
     let mut led = PinDriver::output(pins.gpio25)?;
-    #[cfg(feature = "v3")]
+    #[cfg(feature = "esp32s3")]
     let mut led = PinDriver::output(pins.gpio35)?;
 
-    #[cfg(feature = "v2")]
+    #[cfg(feature = "esp32")]
     let rst = pins.gpio16;
-    #[cfg(feature = "v3")]
+    #[cfg(feature = "esp32s3")]
     let rst = pins.gpio21;
 
-    #[cfg(feature = "v2")]
+    #[cfg(feature = "esp32")]
     let sda = pins.gpio4;
-    #[cfg(feature = "v3")]
+    #[cfg(feature = "esp32s3")]
     let sda = pins.gpio17;
 
-    #[cfg(feature = "v2")]
+    #[cfg(feature = "esp32")]
     let scl = pins.gpio15;
-    #[cfg(feature = "v3")]
+    #[cfg(feature = "esp32s3")]
     let scl = pins.gpio18;
 
     let mut display = Display::new(i2c0, rst, sda, scl)?;
