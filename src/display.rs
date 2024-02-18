@@ -1,5 +1,3 @@
-use std::fmt::Write;
-
 // source: https://github.com/andy31415/rust-esp32-c3-demos/blob/oled_wifi/src/main.rs
 // https://randomnerdtutorials.com/esp32-ssd1306-oled-display-arduino-ide/
 // https://www.roboter-bausatz.de/p/lora-esp32-entwicklungsboard-sx1278-mit-0.96-oled-display-v3-868mhz-915mhz
@@ -93,14 +91,9 @@ where
             .text_color(BinaryColor::On)
             .build();
 
-        Text::with_baseline(
-            &format!("{}", text),
-            Point::new(0, 16),
-            text_style,
-            Baseline::Top,
-        )
-        .draw(&mut self.display)
-        .map_err(|e| anyhow::anyhow!("Txt2 error: {:?}", e))?;
+        Text::with_baseline(text, Point::new(0, 16), text_style, Baseline::Top)
+            .draw(&mut self.display)
+            .map_err(|e| anyhow::anyhow!("Txt2 error: {:?}", e))?;
 
         self.display
             .flush()
