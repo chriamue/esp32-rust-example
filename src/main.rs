@@ -39,10 +39,24 @@ fn main() -> anyhow::Result<()> {
         ..
     } = peripherals;
 
+    #[cfg(feature = "v2")]
+    let mut led = PinDriver::output(pins.gpio25)?;
+    #[cfg(feature = "v3")]
     let mut led = PinDriver::output(pins.gpio35)?;
 
+    #[cfg(feature = "v2")]
+    let rst = pins.gpio16;
+    #[cfg(feature = "v3")]
     let rst = pins.gpio21;
+
+    #[cfg(feature = "v2")]
+    let sda = pins.gpio4;
+    #[cfg(feature = "v3")]
     let sda = pins.gpio17;
+
+    #[cfg(feature = "v2")]
+    let scl = pins.gpio15;
+    #[cfg(feature = "v3")]
     let scl = pins.gpio18;
 
     let mut oled_reset = PinDriver::output(rst)?;

@@ -22,8 +22,17 @@ pub struct Display {}
 impl Display {
     pub fn new(
         i2c: I2C0,
+        #[cfg(feature = "v2")]
+        rst: gpio::Gpio16,
+        #[cfg(feature = "v3")]
         rst: gpio::Gpio21,
+        #[cfg(feature = "v2")]
+        sda: gpio::Gpio4,
+        #[cfg(feature = "v3")]
         sda: gpio::Gpio17,
+        #[cfg(feature = "v2")]
+        scl: gpio::Gpio15,
+        #[cfg(feature = "v3")]
         scl: gpio::Gpio18,
     ) -> Result<
         Ssd1306<

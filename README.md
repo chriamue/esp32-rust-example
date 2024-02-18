@@ -14,6 +14,12 @@ Add user to dialout group to access serial port:
 sudo usermod -a -G dialout $USER
 ```
 
+Install cargo espflash:
+
+```bash
+cargo install cargo-espflash
+```
+
 ## Board Information
 
 ```bash
@@ -55,6 +61,19 @@ Copy `example.env` to `.env` and adjust the settings.
 ```bash
 . $HOME/export-esp.sh
 cargo build
+```
+
+### Features
+
+I tested on two boards:
+
+- [Heltec WiFi LoRa 32 V2](https://resource.heltec.cn/download/Manual%20Old/WiFi%20Lora32Manual.pdf)
+- [Heltec WiFi LoRa 32 V3](https://heltec.org/project/wifi-lora-32-v3/)
+
+To configure the right pins, you can use the `v2` or `v3` feature:
+
+```bash
+cargo build --features v2
 ```
 
 ## Flashing
